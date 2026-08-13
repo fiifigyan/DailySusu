@@ -1,0 +1,238 @@
+generator client {
+  provider = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                      String    @id @default(uuid())
+  email                   String    @unique
+  phone                   String
+  phoneHash               String    @unique
+  password                String
+  firstName               String
+  lastName                String
+  isVerified              Boolean   @default(false)
+  role                    Role      @default(MEMBER)
+  paystackRecipientCode   String?                    // 🆕 For disbursements
+  paystackAuthorizationCode String?                  // 🆕 For recurring charges
+  deviceTokens            String[]
+  lastLoginAt             DateTime?
+  failedLoginAttempts     Int       @default(0)
+  lockedUntil             DateTime?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  groups                  GroupMember[]
+  contributions           Contribution[]
+  sentOTPs                OTP[]
+  refreshTokens           RefreshToken[]
+  auditLogs               AuditLog[]
+}
+
+enum Role {
+  MEMBER
+  GROUP_ADMIN
+  APP_ADMIN
+}
+
+model RefreshToken {
+  id          String    @id @default(uuid())
+  token       String    @unique
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt   DateTime
+  createdAt   DateTime  @default(now())
+  revoked     Boolean   @default(false)
+}
+
+model OTP {
+  id          String    @id @default(uuid())
+  code        String
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  purpose     OTPPurpose
+  expiresAt   DateTime
+  used        Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+}
+
+enum OTPPurpose {
+  VERIFICATION
+  PASSWORD_RESET
+  LOGIN
+}
+
+model SusuGroup {
+  id                  String    @id @default(uuid())
+  name                String
+  description         String?
+  createdById         String
+  createdBy           User      @relation("CreatedGroups", fields: [createdById], references: [id])
+  memberCount         Int
+  dailyContribution   Float
+  dailyPayout         Float
+  dailySurplus        Float
+  surplusUse          String?                   // JSON string with allocation rules
+  startDate           DateTime?
+  endDate             DateTime?
+  currentDay          Int       @default(0)
+  totalDays           Int
+  status              GroupStatus @default(FORMING)
+  verificationMethod  VerificationMethod @default(MANUAL)
+  appFeePerMember     Float     @default(0)     // Always 0 - no member fees
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  members             GroupMember[]
+  contributions       Contribution[]
+  payouts             Payout[]
+  appFees             AppFee[]
+  auditLogs           AuditLog[]
+}
+
+enum GroupStatus {
+  FORMING
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum VerificationMethod {
+  MANUAL
+  AUTO_VERIFY
+}
+
+model GroupMember {
+  id                  String    @id @default(uuid())
+  groupId             String
+  group               SusuGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  userId              String
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  position            Int
+  hasReceivedPayout   Boolean   @default(false)
+  payoutDate          DateTime?
+  totalPaid           Int       @default(0)
+  totalMissed         Int       @default(0)
+  isActive            Boolean   @default(true)
+  hasPaidAppFee       Boolean   @default(false)
+  joinedAt            DateTime  @default(now())
+
+  @@unique([groupId, userId])
+  @@unique([groupId, position])
+}
+
+model Contribution {
+  id                  String    @id @default(uuid())
+  groupId             String
+  group               SusuGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  memberId            String
+  member              GroupMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  userId              String
+  user                User      @relation(fields: [userId], references: [id])
+  day                 Int
+  amount              Float
+  status              ContributionStatus @default(PENDING)
+  transactionRef      String?   @unique
+  paymentMethod       String?
+  paidAt              DateTime?
+  verifiedAt          DateTime?
+  recordedBy          String
+  notes               String?
+  createdAt           DateTime  @default(now())
+
+  @@unique([memberId, day])
+}
+
+enum ContributionStatus {
+  PENDING
+  PAID
+  VERIFIED
+  FAILED
+  MISSED
+}
+
+model Payout {
+  id                  String    @id @default(uuid())
+  groupId             String
+  group               SusuGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  recipientId         String
+  recipient           GroupMember @relation(fields: [recipientId], references: [id])
+  day                 Int
+  amount              Float
+  status              PayoutStatus @default(PENDING)
+  bulkTransferId      String?                   // 🆕 Paystack bulk transfer reference
+  distributedAt       DateTime?
+  confirmedBy         String?
+  notes               String?
+  createdAt           DateTime  @default(now())
+
+  @@unique([groupId, day])
+}
+
+enum PayoutStatus {
+  PENDING
+  PROCESSING
+  DISTRIBUTED
+  FAILED
+  DISPUTED
+}
+
+model AppFee {
+  id                  String    @id @default(uuid())
+  memberId            String?
+  member              GroupMember? @relation(fields: [memberId], references: [id], onDelete: SetNull)
+  groupId             String
+  group               SusuGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  amount              Float
+  month               String
+  type                FeeType   @default(DAILY_SURPLUS)
+  transactionRef      String?
+  status              FeeStatus @default(PENDING)
+  paidAt              DateTime?
+  createdAt           DateTime  @default(now())
+}
+
+enum FeeType {
+  DAILY_SURPLUS
+  PENALTY
+  ADJUSTMENT
+}
+
+enum FeeStatus {
+  PENDING
+  PAID
+  FAILED
+}
+
+model AuditLog {
+  id          String    @id @default(uuid())
+  userId      String?
+  user        User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  groupId     String?
+  group       SusuGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  action      String
+  details     String
+  metadata    Json?
+  ipAddress   String?
+  createdAt   DateTime  @default(now())
+}
+
+model FailedDisbursement {
+  id              String    @id @default(uuid())
+  groupId         String
+  payoutId        String
+  recipientPhone  String
+  amount          Float
+  description     String
+  error           String
+  retryCount      Int       @default(0)
+  maxRetries      Int       @default(3)
+  lastRetryAt     DateTime?
+  resolved        Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+}
