@@ -19,6 +19,7 @@ import contributionRoutes from './routes/contribution.routes';
 import adminRoutes from './routes/admin.routes';
 import webhookRoutes from './routes/webhook.routes';
 import paymentRoutes from './routes/payment.routes';
+import inviteRoutes from './routes/invite.routes';
 
 const app = express();
 const httpServer = createServer(app);
@@ -106,6 +107,7 @@ app.use('/api/v1/contributions', contributionRoutes);
 app.use('/api/v1/webhooks', webhookRoutes);
 app.use('/api/v1/admin', adminRoutes);
 app.use('/api/v1/payments', paymentRoutes);
+app.use('/api/v1/invites', inviteRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

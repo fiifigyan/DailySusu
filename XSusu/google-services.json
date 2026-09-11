@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "896406640126",
+    "project_id": "xsusu-d88eb",
+    "storage_bucket": "xsusu-d88eb.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:896406640126:android:762ec2a792cf1441ff9caf",
+        "android_client_info": {
+          "package_name": "com.biigggx.xsusu"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAJdlLTbhmGZ_cIT4omagKPnwjk2iYN-_M"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
